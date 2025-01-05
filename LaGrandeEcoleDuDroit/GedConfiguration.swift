@@ -1,7 +1,7 @@
 import FirebaseAuth
 import FirebaseFirestore
 
-class GedConfig {
+class GedConfiguration {
     #if DEBUG
     static let serverUrl = "http://192.168.1.67:3000" // Set your local server url here
     #else
