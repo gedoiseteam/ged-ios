@@ -99,4 +99,26 @@ final class AuthenticationTests: XCTestCase {
             }
             .store(in: &cancellables)
     }
+    
+    func test_verifyEmailFormatUseCase_should_return_true_when_email_is_correct() {
+        // Given
+        let email: String = "email@example.com"
+        
+        // When
+        let result: Bool = VerifyEmailFormatUseCase.execute(email)
+        
+        // Then
+        XCTAssertTrue(result)
+    }
+    
+    func test_verifyEmailFormatUseCase_should_return_false_when_email_is_incorrect() {
+        // Given
+        let email: String = "email"
+        
+        // When
+        let result: Bool = VerifyEmailFormatUseCase.execute(email)
+        
+        // Then
+        XCTAssertFalse(result)
+    }
 }
