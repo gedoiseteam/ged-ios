@@ -1,68 +1,68 @@
 import SwiftUI
 
 struct EmailVerificationView: View {
-    @EnvironmentObject private var registrationViewModel: RegistrationViewModel
+    @StateObject private var emailVerificationViewModel: EmailVerificationViewModel = AuthenticationInjection.shared.resolve(EmailVerificationViewModel.self)
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @State private var isValid = false
     @State private var isAnimating = false
+    private let email: String
+    
+    init(email: String) {
+        self.email = email
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: GedSpacing.medium) {
-            Text(
-                getString(
-                    gedString: GedString.email_verification_explanation,
-                    registrationViewModel.email
-                )
-            ).font(.title3)
+            Text(getString(.emailVerificationExplanationBegining))
+                .font(.title3)
             
-            if case .error(let message) = registrationViewModel.registrationState {
+             + Text(email)
+                .fontWeight(.semibold)
+                .font(.title3)
+                
+             + Text(getString(.emailVerificationExplanationEnd))
+                .font(.title3)
+            
+            if case .error(let message) = emailVerificationViewModel.authenticationState {
                 HStack {
                     Image(systemName: "exclamationmark.octagon")
                     Text(message)
-                }.foregroundStyle(Color.red)
+                }
+                .foregroundStyle(Color.red)
             }
             
             Image(systemName: "envelope.circle.fill")
                 .resizable()
                 .scaledToFit()
-                .scaleEffect(isAnimating ? 0.35 : 0.3)
+                .scaleEffect(isAnimating ? 0.4 : 0.35)
                 .onAppear() {
                     withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
                         isAnimating = true
                     }
                 }
                 .foregroundStyle(.gedPrimary)
+                .frame(maxHeight: .infinity, alignment: .center)
             
-            Spacer()
-            
-            HStack {
-                Spacer()
-                Button(
-                    action: {
-                        Task { await registrationViewModel.checkVerifiedEmail() }
-                    },
-                    label: {
-                        Text(getString(gedString: GedString.next))
-                            .font(.title2)
-                    }
-                )
-            }.padding()
+                Button(getString(.finish)) {
+                    emailVerificationViewModel.checkVerifiedEmail()
+                }
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.gedPrimary)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .task {
-            await registrationViewModel.sendVerificationEmail()
+        .onAppear {
+            emailVerificationViewModel.sendVerificationEmail()
         }
-        .navigationTitle(getString(gedString: GedString.email_verification_title))
+        .navigationTitle(getString(.emailVerificationTitle))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .navigationBarBackButtonHidden(true)
         .padding()
     }
 }
 
-struct EmailVerificationView_Previews: PreviewProvider {
-    static var previews: some View {
-        let registrationViewModel = DependencyContainer.shared.mockRegistrationViewModel
-        registrationViewModel.email = "example@email.com"
-        
-        return EmailVerificationView()
-            .environmentObject(registrationViewModel)
+#Preview {
+    NavigationStack {
+        EmailVerificationView(email: "example@email.com")
     }
 }

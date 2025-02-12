@@ -9,14 +9,6 @@ class ProfileViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private let logoutUseCase: LogoutUseCase
     
-    let menuItemDatas: [MenuItemData] = [
-        MenuItemData(
-            name: MenuItemData.Name.account,
-            imageName: "person.fill",
-            title: getString(gedString: GedString.account)
-        )
-    ]
-    
     init(
         getCurrentUserUseCase: GetCurrentUserUseCase,
         logoutUseCase: LogoutUseCase
@@ -31,7 +23,7 @@ class ProfileViewModel: ObservableObject {
         do {
             try logoutUseCase.execute()
         } catch {
-            profileState = .error(message: GedString.error_logout)
+            profileState = .error(message: getString(.errorLogout))
             print("Error logging out: \(error)")
         }
     }
@@ -41,10 +33,10 @@ class ProfileViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink(receiveCompletion: { completion in
                 switch completion {
-                case .finished:
-                    break
-                case .failure(let error):
-                    print("Error fetching user: \(error)")
+                    case .finished:
+                        break
+                    case .failure(let error):
+                        print("Error fetching user: \(error)")
                 }
             }, receiveValue: { [weak self] user in
                 self?.currentUser = user

@@ -1,12 +1,44 @@
 import Foundation
+import FirebaseCore
 import CoreData
 
 class ConversationMapper {
+    static func toConversation(conversationUser: ConversationUser) -> Conversation {
+        Conversation(
+            id: conversationUser.id,
+            interlocutorId: conversationUser.interlocutor.id,
+            createdAt: conversationUser.createdAt,
+            state: conversationUser.state
+        )
+    }
+    
+    static func toConversation(localConversation: LocalConversation) -> Conversation? {
+        guard let interlocutorJson = localConversation.interlocutorJson,
+              let data = interlocutorJson.data(using: .utf8),
+              let conversationId = localConversation.conversationId,
+              let createdAt = localConversation.createdAt
+        else {
+            return nil
+        }
+        
+        guard let interlocutor = try? JSONDecoder().decode(User.self, from: data) else {
+            return nil
+        }
+        
+        return Conversation(
+            id: conversationId,
+            interlocutorId: interlocutor.id,
+            createdAt: createdAt,
+            state: .created
+        )
+    }
+    
     static func toConversationWithInterlocutor(localConversation: LocalConversation) -> (Conversation, User)? {
         guard let interlocutorJson = localConversation.interlocutorJson,
               let data = interlocutorJson.data(using: .utf8),
               let conversationId = localConversation.conversationId,
-              let createdAt = localConversation.createdAt else {
+              let createdAt = localConversation.createdAt
+        else {
             return nil
         }
 
@@ -17,18 +49,28 @@ class ConversationMapper {
         let conversation = Conversation(
             id: conversationId,
             interlocutorId: interlocutor.id,
-            createdAt: createdAt
+            createdAt: createdAt,
+            state: .created
         )
         
         return (conversation, interlocutor)
     }
 
+    static func toConversationUser(conversationUI: ConversationUI) -> ConversationUser {
+        ConversationUser(
+            id: conversationUI.id,
+            interlocutor: conversationUI.interlocutor,
+            createdAt: conversationUI.createdAt,
+            state: conversationUI.state
+        )
+    }
     
     static func toConversationUser(conversation: Conversation, interlocutor: User) -> ConversationUser {
         ConversationUser(
             id: conversation.id,
             interlocutor: interlocutor,
-            createdAt: conversation.createdAt
+            createdAt: conversation.createdAt,
+            state: conversation.state
         )
     }
     
@@ -40,7 +82,18 @@ class ConversationMapper {
         return Conversation(
             id: remoteConversation.conversationId,
             interlocutorId: interlocutorId,
-            createdAt: remoteConversation.createdAt.dateValue()
+            createdAt: remoteConversation.createdAt.dateValue(),
+            state: .created
+        )
+    }
+    
+    static func toConversationUI(conversationUser: ConversationUser) -> ConversationUI {
+        ConversationUI(
+            id: conversationUser.id,
+            interlocutor: conversationUser.interlocutor,
+            lastMessage: nil,
+            createdAt: conversationUser.createdAt,
+            state: conversationUser.state
         )
     }
     
@@ -68,5 +121,13 @@ class ConversationMapper {
         localConversation.createdAt = conversation.createdAt
         
         return localConversation
+    }
+    
+    static func toRemote(conversation: Conversation, currentUserId: String) -> RemoteConversation {
+        RemoteConversation(
+            conversationId: conversation.id,
+            participants: [currentUserId, conversation.interlocutorId],
+            createdAt: Timestamp(date: conversation.createdAt)
+        )
     }
 }

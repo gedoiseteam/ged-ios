@@ -1,11 +1,11 @@
 class LoginUseCase {
-    private let authenticationRemoteRepository: AuthenticationRemoteRepository
+    private let authenticationRepository: AuthenticationRepository
     
-    init(authenticationRemoteRepository: AuthenticationRemoteRepository) {
-        self.authenticationRemoteRepository = authenticationRemoteRepository
+    init(authenticationRepository: AuthenticationRepository) {
+        self.authenticationRepository = authenticationRepository
     }
     
     func execute(email: String, password: String) async throws -> String {
-        try await authenticationRemoteRepository.login(email: email, password: password)
+        try await authenticationRepository.login(email: email, password: password)
     }
 }

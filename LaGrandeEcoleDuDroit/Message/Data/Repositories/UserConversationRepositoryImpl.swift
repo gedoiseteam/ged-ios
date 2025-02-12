@@ -1,7 +1,8 @@
 import Combine
 
+private let tag = String(describing: UserConversationRepositoryImpl.self)
+
 class UserConversationRepositoryImpl: UserConversationRepository {
-    private let tag = String(describing: UserConversationRepositoryImpl.self)
     private let userRepository: UserRepository
     private let conversationRepository: ConversationRepository
     private var cancellables = Set<AnyCancellable>()
@@ -18,11 +19,34 @@ class UserConversationRepositoryImpl: UserConversationRepository {
     func getUserConversations() -> AnyPublisher<ConversationUser, ConversationError> {
         conversationRepository.getConversationsFromLocal()
             .map { conversation, interlocutor in
-                ConversationMapper.toConversationUser(
-                    conversation: conversation,
-                    interlocutor: interlocutor
-                )
+                ConversationMapper.toConversationUser(conversation: conversation, interlocutor: interlocutor)
             }.eraseToAnyPublisher()
+    }
+    
+    func createConversation(conversationUser: ConversationUser) async throws {
+        let conversation = ConversationMapper.toConversation(conversationUser: conversationUser)
+        
+        guard let currentUser = userRepository.currentUser else {
+            throw UserError.currentUserNotFound
+        }
+        
+        try await conversationRepository.createConversation(
+            conversation: conversation,
+            interlocutor: conversationUser.interlocutor,
+            currentUser: currentUser
+        )
+    }
+    
+    func updateConversation(conversationUser: ConversationUser) async throws {
+        let conversation = ConversationMapper.toConversation(conversationUser: conversationUser)
+        try conversationRepository.upsertLocalConversation(
+            conversation: conversation,
+            interlocutor: conversationUser.interlocutor
+        )
+    }
+    
+    func deleteConversation(conversationId: String) async throws {
+        try await conversationRepository.deleteConversation(conversationId: conversationId)
     }
     
     func stopGettingUserConversations() {
@@ -43,19 +67,27 @@ class UserConversationRepositoryImpl: UserConversationRepository {
                 }
                 
                 return self.userRepository.getUserPublisher(userId: conversation.interlocutorId)
-                    .map { interlocutor in (conversation, interlocutor) }.eraseToAnyPublisher()
+                    .map { interlocutor in (conversation, interlocutor) }
+                    .eraseToAnyPublisher()
             }
-            .sink(receiveCompletion: { [weak self] completion in
-                guard let self = self else { return }
-                
+            .sink { completion in
                 switch completion {
-                case .finished:
-                    d(self.tag, "UserConversationRepositoryImpl: listenRemoteConversations finished")
-                case .failure(let error):
-                    e(self.tag, "UserConversationRepositoryImpl: listenRemoteConversations error: \(error)")
+                    case .finished:
+                        d(tag, "UserConversationRepositoryImpl: listenRemoteConversations finished")
+                        
+                    case .failure(let error):
+                        e(tag, "UserConversationRepositoryImpl: listenRemoteConversations error: \(error)")
                 }
-            }, receiveValue: { [weak self] (conversation, interlocutor) in
-                self?.conversationRepository.upsertLocalConversation(conversation: conversation, interlocutor: interlocutor)
-            }).store(in: &cancellables)
+            } receiveValue: { (conversation, interlocutor) in
+                do {
+                    try self.conversationRepository.upsertLocalConversation(
+                        conversation: conversation,
+                        interlocutor: interlocutor
+                    )
+                } catch {
+                    e(tag, "UserConversationRepositoryImpl: listenRemoteConversations error: \(error)")
+                }
+            }
+            .store(in: &cancellables)
     }
 }

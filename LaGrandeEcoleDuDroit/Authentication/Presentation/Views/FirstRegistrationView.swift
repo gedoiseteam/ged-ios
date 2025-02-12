@@ -2,72 +2,64 @@ import SwiftUI
 
 struct FirstRegistrationView: View {
     @EnvironmentObject private var registrationViewModel: RegistrationViewModel
-    @State private var inputFocused: InputField?
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
+    @State private var inputFieldFocused: InputField?
     @State private var isValidNameInputs = false
-    private let firstNameTextFieldTitle = getString(gedString: GedString.firstName)
-    private let lastNameTextFieldTitle = getString(gedString: GedString.lastName)
-    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         VStack(alignment: .leading, spacing: GedSpacing.medium) {
-            Text(getString(gedString: GedString.enter_first_name_and_last_name))
-                .font(.title2)
+            Text(getString(.enterFirstNameAndLastName))
+                .font(.title3)
             
             FocusableOutlinedTextField(
-                title: firstNameTextFieldTitle,
+                title: getString(.firstName),
                 text: $registrationViewModel.firstName,
-                defaultFocusValue: InputField.firstName,
-                inputFocused: $inputFocused
+                inputField: InputField.firstName,
+                inputFieldFocused: $inputFieldFocused
             )
             
             FocusableOutlinedTextField(
-                title: lastNameTextFieldTitle,
+                title: getString(.lastName),
                 text: $registrationViewModel.lastName,
-                defaultFocusValue: InputField.lastName,
-                inputFocused: $inputFocused
+                inputField: InputField.lastName,
+                inputFieldFocused: $inputFieldFocused
             )
-            
-            if case .error(let message) = registrationViewModel.registrationState {
-                Text(message).foregroundColor(.red)
-            }
-            
+         
             Spacer()
             
-            HStack {
-                Spacer()
-                Button(
-                    action: {
-                        isValidNameInputs = registrationViewModel.validateNameInputs()
-                    },
-                    label: {
-                        Text(getString(gedString: GedString.next))
-                            .font(.title2)
-                    }
-                ).overlay {
-                    NavigationLink(
-                        destination: SecondRegistrationView().environmentObject(registrationViewModel),
-                        isActive: $isValidNameInputs
-                    ) {
-                        EmptyView()
-                    }
+            Button(action: {
+                navigationCoordinator.push(AuthenticationScreen.secondRegistration)
+            }) {
+                if registrationViewModel.nameInputsNotEmpty() {
+                    Text(getString(.next))
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.gedPrimary)
+                } else {
+                    Text(getString(.next))
+                        .font(.title2)
+                        .fontWeight(.medium)
                 }
             }
+            .disabled(!registrationViewModel.nameInputsNotEmpty())
             .padding()
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(UIColor.systemBackground))
         .padding()
-        .onAppear {
-            registrationViewModel.resetState()
-        }
-        .onTapGesture {
-            inputFocused = nil
-        }
+        .onAppear { registrationViewModel.resetState() }
+        .contentShape(Rectangle())
+        .onTapGesture { inputFieldFocused = nil }
         .registrationToolbar(step: 1, maxStep: 3)
     }
 }
 
 #Preview {
-    FirstRegistrationView()
-        .environmentObject(DependencyContainer.shared.mockRegistrationViewModel)
+    let mockRegistrationViewModel = AuthenticationInjection.shared.resolveWithMock().resolve(RegistrationViewModel.self)!
+    
+    NavigationStack {
+        FirstRegistrationView()
+            .environmentObject(mockRegistrationViewModel)
+            .environmentObject(CommonInjection.shared.resolve(NavigationCoordinator.self))
+    }
 }

@@ -1,27 +1,61 @@
 import SwiftUI
 
 struct AuthenticationView: View {
-    @EnvironmentObject private var authenticationViewModel: AuthenticationViewModel
-    @EnvironmentObject private var registrationViewModel: RegistrationViewModel
+    @StateObject private var authenticationViewModel: AuthenticationViewModel = AuthenticationInjection.shared.resolve(AuthenticationViewModel.self)
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @State private var isInputsFocused: Bool = false
+    @State private var isLoading: Bool = false
+    @State private var showEmailNotVerifiedAlert: Bool = false
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: GedSpacing.verylLarge) {
+        NavigationStack(path: $navigationCoordinator.path) {
+            VStack(spacing: GedSpacing.veryLarge) {
                 Header()
                 
-                CredentialsInputs(isInputsFocused: $isInputsFocused)
-                    .environmentObject(authenticationViewModel)
+                CredentialsInputs(
+                    isInputsFocused: $isInputsFocused,
+                    email: $authenticationViewModel.email,
+                    password: $authenticationViewModel.password,
+                    isLoading: isLoading,
+                    authenticationState: authenticationViewModel.authenticationState
+                )
+                .environmentObject(navigationCoordinator)
                 
-                Buttons()
-                    .environmentObject(authenticationViewModel)
-                    .environmentObject(registrationViewModel)
+                Buttons(
+                    onLoadingButtonClick: {
+                        Task {
+                            if authenticationViewModel.validateInputs() {
+                                await authenticationViewModel.login()
+                            }
+                        }
+                    },
+                    isLoading: isLoading
+                )
+                .environmentObject(authenticationViewModel)
+                .environmentObject(navigationCoordinator)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(Color(UIColor.systemBackground))
+            .onReceive(authenticationViewModel.$authenticationState) { state in
+                showEmailNotVerifiedAlert = state == .emailNotVerified
+                isLoading = state == .loading
+            }
+            .contentShape(Rectangle())
             .onTapGesture {
                 isInputsFocused = false
+            }
+            .alert(
+                getString(.emailNotVerified),
+                isPresented: $showEmailNotVerifiedAlert,
+                presenting: ""
+            ) { _ in
+                Button(getString(.verifyEmail)) {
+                    navigationCoordinator.push(AuthenticationScreen.emailVerification(email: authenticationViewModel.email))
+                }
+                
+                Button(getString(.cancel), role: .cancel) {}
+            } message: { _ in
+                Text(getString(.emailNotVerifiedDialogMessage))
             }
         }
     }
@@ -30,8 +64,6 @@ struct AuthenticationView: View {
 private struct Header: View {
     private let imageWidth = UIScreen.main.bounds.width * 0.4
     private let imageHeight = UIScreen.main.bounds.height * 0.2
-    private let titleAuthenticationPage = getString(gedString: GedString.appName)
-    private let subtitleAuthenticationPage = getString(gedString: GedString.authenticationPageSubtitle)
     
     var body: some View {
         VStack(spacing: GedSpacing.small) {
@@ -40,13 +72,13 @@ private struct Header: View {
                 .scaledToFit()
                 .frame(width: imageWidth, height: imageHeight)
             
-            Text(titleAuthenticationPage)
+            Text(getString(.appName))
                 .font(.title)
                 .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
             
-            Text(subtitleAuthenticationPage)
+            Text(getString(.authenticationPageSubtitle))
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -56,126 +88,111 @@ private struct Header: View {
 }
 
 private struct CredentialsInputs: View {
-    @EnvironmentObject private var authenticationViewModel: AuthenticationViewModel
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
+    @Binding private var email: String
+    @Binding private var password: String
     @Binding var isInputsFocused: Bool
-    @State private var isLoading: Bool = false
-    @State private var inputFocused: InputField?
-    private let titleEmailTextField = getString(gedString: GedString.email)
-    private let titlePasswordTextField = getString(gedString: GedString.password)
-    private let forgottenPassword = getString(gedString: GedString.forgotten_password)
+    @State private var inputFieldFocused: InputField?
+    @State private var forgottenPasswordClicked: Bool = false
+    private var isLoading: Bool
+    private var authenticationState: AuthenticationState
+    
+    init(
+        isInputsFocused: Binding<Bool>,
+        email: Binding<String>,
+        password: Binding<String>,
+        isLoading: Bool,
+        authenticationState: AuthenticationState
+    ) {
+        self._isInputsFocused = isInputsFocused
+        self._email = email
+        self._password = password
+        self.isLoading = isLoading
+        self.authenticationState = authenticationState
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: GedSpacing.medium) {
             FocusableOutlinedTextField(
-                title: titleEmailTextField,
-                text: $authenticationViewModel.email,
-                defaultFocusValue: InputField.email,
-                inputFocused: $inputFocused,
-                isDisable: $isLoading
+                title: getString(.email),
+                text: $email,
+                inputField: InputField.email,
+                inputFieldFocused: $inputFieldFocused,
+                isDisable: isLoading
             )
+            .textInputAutocapitalization(.never)
             .simultaneousGesture(TapGesture().onEnded({
                 isInputsFocused = true
             }))
             
             FocusableOutlinedPasswordTextField(
-                title: titlePasswordTextField,
-                text: $authenticationViewModel.password,
-                defaultFocusValue: InputField.password,
-                inputFocused: $inputFocused,
-                isDisable: $isLoading
+                title: getString(.password),
+                text: $password,
+                inputField: InputField.password,
+                inputFieldFocused: $inputFieldFocused,
+                isDisable: isLoading
             )
             .simultaneousGesture(TapGesture().onEnded({
                 isInputsFocused = true
             }))
             
-            NavigationLink(destination: {}) {
-                Text(forgottenPassword)
-                    .foregroundStyle(.accent)
-            }.disabled(isLoading)
+            Button(getString(.forgottenPassword)) {
+                navigationCoordinator.push(AuthenticationScreen.forgottenPassword)
+            }
+            .disabled(isLoading)
             
-            if case .error(let message) = authenticationViewModel.authenticationState {
+            if case .error(let message) = authenticationState {
                 Text(message)
                     .foregroundColor(.red)
             }
         }
         .onChange(of: isInputsFocused) { isFocused in
             if !isFocused {
-                inputFocused = nil
+                inputFieldFocused = nil
             }
-        }
-        .onReceive(authenticationViewModel.$authenticationState) { state in
-            isLoading = state == .loading
         }
     }
 }
 
 private struct Buttons: View {
-    @EnvironmentObject private var authenticationViewModel: AuthenticationViewModel
-    @EnvironmentObject private var registrationViewModel: RegistrationViewModel
-    
-    private let login = getString(gedString: GedString.login)
-    private let register = getString(gedString: GedString.register)
-    private let notRegisterYet = getString(gedString: GedString.not_register_yet)
-    @State private var isLoading: Bool = false
-    @State private var destination = AnyView(FirstRegistrationView())
-    @State private var showEmailNotVerifiedAlert: Bool = false
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @State private var isActive: Bool = false
+    private var onLoadingButtonClick: () -> Void
+    private var isLoading: Bool
+    
+    init(
+        onLoadingButtonClick: @escaping () -> Void,
+        isLoading: Bool
+    ) {
+        self.onLoadingButtonClick = onLoadingButtonClick
+        self.isLoading = isLoading
+    }
     
     var body: some View {
         VStack(spacing: GedSpacing.medium) {
             LoadingButton(
-                label: login,
-                onClick: {
-                    Task {
-                        if authenticationViewModel.validateInputs() {
-                            await authenticationViewModel.login()
-                        }
-                    }
-                },
-                isLoading: $isLoading
+                label: getString(.login),
+                onClick: onLoadingButtonClick,
+                isLoading: isLoading
             )
             
             HStack {
-                Text(notRegisterYet)
+                Text(getString(.notRegisterYet))
                     .foregroundStyle(Color.primary)
                 
-                NavigationLink(
-                    destination: FirstRegistrationView()
-                        .environmentObject(registrationViewModel)
-                ) {
-                    Text(register)
-                        .foregroundColor(.gedPrimary)
-                        .fontWeight(.semibold)
-                        .underline()
+                Button(getString(.register)) {
+                    navigationCoordinator.push(AuthenticationScreen.firstRegistration)
                 }
+                .foregroundColor(.gedPrimary)
+                .fontWeight(.semibold)
+                .underline()
             }
-        }
-        .onReceive(authenticationViewModel.$authenticationState) { state in
-            showEmailNotVerifiedAlert = state == .emailNotVerified
-            isLoading = state == .loading
-        }
-        .alert(
-            getString(gedString: GedString.email_not_verified),
-            isPresented: $showEmailNotVerifiedAlert,
-            presenting: ""
-        ) { data in
-            Button(getString(gedString: GedString.verify_email)) {
-                let registrationViewModel = DependencyContainer.shared.registrationViewModel
-                registrationViewModel.email = authenticationViewModel.email
-                destination = AnyView(
-                    EmailVerificationView().environmentObject(registrationViewModel)
-                )
-                isActive = true
-            }
-            Button(getString(gedString: GedString.cancel), role: .cancel) {}
-        } message: { data in
-            Text(getString(gedString: GedString.email_not_verified_dialog_message))
         }
     }
 }
 
 #Preview {
-    AuthenticationView()
-        .environmentObject(DependencyContainer.shared.mockAuthenticationViewModel)
-        .environmentObject(DependencyContainer.shared.mockRegistrationViewModel)
+    NavigationStack {
+        AuthenticationView()
+    }
 }

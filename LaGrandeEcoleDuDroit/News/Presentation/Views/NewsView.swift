@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct NewsView: View {
-    @EnvironmentObject private var newsViewModel: NewsViewModel
+    @StateObject private var newsViewModel = NewsInjection.shared.resolve(NewsViewModel.self)
+    @EnvironmentObject private var tabBarVisibility: TabBarVisibility
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @State private var isActive: Bool = false
     @State private var isRefreshing: Bool = false
     
@@ -9,7 +11,7 @@ struct NewsView: View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: GedSpacing.medium) {
                 RecentAnnouncementSection(
-                    announcements: $newsViewModel.announcements,
+                    announcements: newsViewModel.announcements,
                     maxHeight: geometry.size.height / 2.5,
                     onRefresh: {
                         try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
@@ -23,6 +25,7 @@ struct NewsView: View {
                     alignment: .top
                 )
                 .environmentObject(newsViewModel)
+                .environmentObject(navigationCoordinator)
                 
                 newsSection
             }
@@ -43,19 +46,20 @@ struct NewsView: View {
                         .fontWeight(.bold)
                 }
             }
+            
             ToolbarItem(placement: .topBarTrailing) {
                 if newsViewModel.currentUser?.isMember == true {
-                    NavigationLink(
-                        destination: CreateAnnouncementView().environmentObject(newsViewModel),
-                        isActive: $isActive
-                    ) {
-                        Button(
-                            action: { isActive = true },
-                            label: { Image(systemName: "plus") }
-                        )
-                    }
+                    Button(
+                        action: {
+                            navigationCoordinator.push(NewsScreen.createAnnouncement)
+                        },
+                        label: { Image(systemName: "plus") }
+                    )
                 }
             }
+        }
+        .onAppear {
+            tabBarVisibility.show = true
         }
     }
 }
@@ -70,18 +74,18 @@ var newsSection: some View {
 
 struct RecentAnnouncementSection: View {
     @EnvironmentObject private var newsViewModel: NewsViewModel
-    @State private var selectedAnnouncement: Announcement? = nil
-    @Binding private var announcements: [Announcement]
-    @State private var contentHeight: CGFloat = .zero
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
+    @State private var isClicked: Bool = false
+    private var announcements: [Announcement]
     private var onRefresh: () async -> Void
     private let maxHeight: CGFloat
     
     init(
-        announcements: Binding<[Announcement]>,
+        announcements: [Announcement],
         maxHeight: CGFloat,
         onRefresh: @escaping () async -> Void
     ) {
-        self._announcements = announcements
+        self.announcements = announcements
         self.maxHeight = maxHeight
         self.onRefresh = onRefresh
     }
@@ -100,31 +104,17 @@ struct RecentAnnouncementSection: View {
                     .frame(maxWidth: .infinity, alignment: .top)
             } else {
                 ScrollView {
-                    ForEach($announcements, id: \.id) { $announcement in
+                    ForEach(announcements) { announcement in
                         GetAnnouncementItem(
                             announcement: announcement,
-                            onClick: { selectedAnnouncement = announcement }
-                        )
-                        .background(
-                            NavigationLink(
-                                destination: AnnouncementDetailView(announcement: $announcement)
-                                    .environmentObject(newsViewModel),
-                                tag: announcement,
-                                selection: $selectedAnnouncement,
-                                label: { EmptyView() }
-                            )
-                            .hidden()
-                        )
-                        .overlay(
-                            GeometryReader { geo in
-                                Color.clear.onAppear {
-                                    contentHeight = geo.size.height
-                                }
+                            onClick: {
+                                navigationCoordinator.push(NewsScreen.announcementDetail(announcement))
                             }
                         )
                     }
                 }
-                .frame(maxHeight: min(maxHeight, contentHeight * CGFloat(announcements.count)))
+                .frame(maxHeight: maxHeight)
+                .fixedSize(horizontal: false, vertical: true)
                 .refreshable {
                     await onRefresh()
                 }
@@ -137,36 +127,31 @@ struct GetAnnouncementItem: View {
     private var announcement: Announcement
     private let onClick: () -> Void
     
-    init(announcement: Announcement, onClick: @escaping () -> Void) {
+    init(
+        announcement: Announcement,
+        onClick: @escaping () -> Void
+    ) {
         self.announcement = announcement
         self.onClick = onClick
     }
     
     var body: some View {
         if case .loading = announcement.state {
-            LoadingAnnouncementItemWithContent(
-                announcement: announcement,
-                onClick: onClick
-            )
+            LoadingAnnouncementItemWithContent(announcement: announcement, onClick: onClick)
         }
         else if case .error = announcement.state {
-            ErrorAnnouncementItemWithContent(
-                announcement: announcement,
-                onClick: onClick
-            )
+            ErrorAnnouncementItemWithContent(announcement: announcement, onClick: onClick)
         } else {
-            AnnouncementItemWithContent(
-                announcement: announcement,
-                onClick: onClick
-            )
+            AnnouncementItemWithContent(announcement: announcement, onClick: onClick)
         }
     }
 }
 
 
 #Preview {
-    NavigationView {
-        NewsView()
-            .environmentObject(DependencyContainer.shared.mockNewsViewModel)
-    }
+   NavigationStack {
+       NewsView()
+           .environmentObject(TabBarVisibility())
+           .environmentObject(NavigationCoordinator())
+   }
 }

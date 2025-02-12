@@ -2,16 +2,13 @@ import Combine
 import os
 import FirebaseAuth
 
-class AuthenticationRemoteRepositoryImpl: AuthenticationRemoteRepository {
+class AuthenticationRepositoryImpl: AuthenticationRepository {
     private let firebaseAuthApi: FirebaseAuthApi
-    @Published private var _isAuthenticated: Bool = false
-    var isAuthenticated: AnyPublisher<Bool, Never> {
-        $_isAuthenticated.eraseToAnyPublisher()
-    }
+    private(set) var isAuthenticated: CurrentValueSubject<Bool, Never> = CurrentValueSubject(false)
     
     init(firebaseAuthApi: FirebaseAuthApi) {
         self.firebaseAuthApi = firebaseAuthApi
-        _isAuthenticated = firebaseAuthApi.isAuthenticated()
+        isAuthenticated.send(firebaseAuthApi.isAuthenticated())
     }
     
     func register(email: String, password: String) async throws -> String {
@@ -21,10 +18,10 @@ class AuthenticationRemoteRepositoryImpl: AuthenticationRemoteRepository {
         } catch let error as NSError {
             if let authErrorCode = AuthErrorCode(rawValue: error.code) {
                 switch authErrorCode {
-                case .emailAlreadyInUse:
-                    throw AuthenticationError.accountAlreadyExist
-                default:
-                    throw AuthenticationError.unknown
+                    case .emailAlreadyInUse:
+                        throw AuthenticationError.accountAlreadyExist
+                    default:
+                        throw AuthenticationError.unknown
                 }
             } else {
                 throw AuthenticationError.unknown
@@ -43,17 +40,17 @@ class AuthenticationRemoteRepositoryImpl: AuthenticationRemoteRepository {
     func login(email: String, password: String) async throws -> String {
         do {
             let authDataResult = try await firebaseAuthApi.signIn(email: email, password: password)
-            _isAuthenticated = true
+            isAuthenticated.send(true)
             return authDataResult.user.uid
         } catch let error as NSError {
             if let authErrorCode = AuthErrorCode(rawValue: error.code) {
                 switch authErrorCode {
-                case .wrongPassword, .userNotFound, .invalidCredential:
-                    throw AuthenticationError.invalidCredentials
-                case .userDisabled:
-                    throw AuthenticationError.userDisabled
-                default:
-                    throw AuthenticationError.unknown
+                    case .wrongPassword, .userNotFound, .invalidCredential:
+                        throw AuthenticationError.invalidCredentials
+                    case .userDisabled:
+                        throw AuthenticationError.userDisabled
+                    default:
+                        throw AuthenticationError.unknown
                 }
             }
             else {
@@ -65,7 +62,7 @@ class AuthenticationRemoteRepositoryImpl: AuthenticationRemoteRepository {
     func logout() throws {
         do {
             try firebaseAuthApi.signOut()
-            _isAuthenticated = false
+            isAuthenticated.send(false)
         } catch {
             throw AuthenticationError.unknown
         }

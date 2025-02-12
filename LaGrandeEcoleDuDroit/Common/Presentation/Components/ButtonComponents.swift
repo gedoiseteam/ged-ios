@@ -1,9 +1,19 @@
 import SwiftUI
 
 struct LoadingButton: View {
-    let label: String
-    let onClick: () -> Void
-    @Binding var isLoading: Bool
+    private let label: String
+    private let onClick: () -> Void
+    private var isLoading: Bool
+    
+    init(
+        label: String,
+        onClick: @escaping () -> Void,
+        isLoading: Bool
+    ) {
+        self.label = label
+        self.onClick = onClick
+        self.isLoading = isLoading
+    }
     
     var body: some View {
         Button(action: onClick) {
@@ -30,13 +40,11 @@ struct LoadingButton: View {
 }
 
 #Preview {
-    var isLoading: Binding<Bool> = .constant(false)
-    
-    VStack(spacing: GedSpacing.verylLarge) {
+    VStack(spacing: GedSpacing.veryLarge) {
         LoadingButton(
             label: "Loading button",
             onClick: {},
-            isLoading : isLoading
+            isLoading : false
         )        
     }.padding()
 }

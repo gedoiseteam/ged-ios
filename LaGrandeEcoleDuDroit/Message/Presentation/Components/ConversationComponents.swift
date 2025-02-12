@@ -1,26 +1,28 @@
 import SwiftUI
 
 struct ReadConversationItem: View {
-    private let conversationUI: ConversationUI
+    private var conversationUI: ConversationUI
     private let onClick: () -> Void
+    private let onLongClick: () -> Void
     
     @State private var isClicked: Bool = false
     @State private var elapsedTime: ElapsedTime = .now(seconds: 0)
     @State private var elapsedTimeText: String = ""
     
-    init(conversationUI: ConversationUI, onClick: @escaping () -> Void) {
+    init(
+        conversationUI: ConversationUI,
+        onClick: @escaping () -> Void,
+        onLongClick: @escaping () -> Void
+    ) {
         self.conversationUI = conversationUI
         self.onClick = onClick
+        self.onLongClick = onLongClick
     }
     
     var body: some View {
         if let lastMessage = conversationUI.lastMessage {
             HStack(alignment: .center) {
-                if let profilePictureUrl = conversationUI.interlocutor.profilePictureUrl {
-                    ProfilePicture(url: profilePictureUrl, scale: 0.4)
-                } else {
-                    DefaultProfilePicture(scale: 0.4)
-                }
+                ProfilePicture(url: conversationUI.interlocutor.profilePictureUrl, scale: 0.42)
                 
                 VStack(alignment: .leading, spacing: GedSpacing.verySmall) {
                     HStack {
@@ -42,8 +44,9 @@ struct ReadConversationItem: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
             .padding(.vertical, GedSpacing.small)
-            .background(Color(UIColor.systemBackground))
+            .contentShape(Rectangle())
             .onClick(isClicked: $isClicked, action: onClick)
+            .onLongClick(isClicked: $isClicked, action: onLongClick)
             .onAppear {
                 elapsedTimeText = updateElapsedTimeText(for: lastMessage.date)
             }
@@ -52,7 +55,11 @@ struct ReadConversationItem: View {
             }
         }
         else {
-            EmptyConversationItem(conversationUI: conversationUI, onClick: onClick)
+            EmptyConversationItem(
+                conversationUI: conversationUI,
+                onClick: onClick,
+                onLongClick: onLongClick
+            )
         }
     }
 }
@@ -60,24 +67,25 @@ struct ReadConversationItem: View {
 struct UnreadConversationItem:View {
     private var conversationUI: ConversationUI
     private let onClick: () -> Void
-    
+    private let onLongClick: () -> Void
     @State private var isClicked: Bool = false
     @State private var elapsedTime: ElapsedTime = .now(seconds: 0)
     @State private var elapsedTimeText: String = ""
     
-    init(conversationUI: ConversationUI, onClick: @escaping () -> Void) {
+    init(
+        conversationUI: ConversationUI,
+        onClick: @escaping () -> Void,
+        onLongClick: @escaping () -> Void
+    ) {
         self.conversationUI = conversationUI
         self.onClick = onClick
+        self.onLongClick = onLongClick
     }
     
     var body: some View {
         if let lastMessage = conversationUI.lastMessage {
             HStack(alignment: .center) {
-                if let profilePictureUrl = conversationUI.interlocutor.profilePictureUrl {
-                    ProfilePicture(url: profilePictureUrl, scale: 0.4)
-                } else {
-                    DefaultProfilePicture(scale: 0.4)
-                }
+                ProfilePicture(url: conversationUI.interlocutor.profilePictureUrl, scale: 0.4)
                 
                 VStack(alignment: .leading, spacing: GedSpacing.verySmall) {
                     HStack {
@@ -107,8 +115,9 @@ struct UnreadConversationItem:View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
             .padding(.vertical, GedSpacing.small)
-            .background(Color(UIColor.systemBackground))
+            .contentShape(Rectangle())
             .onClick(isClicked: $isClicked, action: onClick)
+            .onLongClick(isClicked: $isClicked, action: onLongClick)
             .onAppear {
                 elapsedTimeText = updateElapsedTimeText(for: lastMessage.date)
             }
@@ -116,7 +125,11 @@ struct UnreadConversationItem:View {
                 elapsedTimeText = updateElapsedTimeText(for: newDate)
             }
         } else {
-            EmptyConversationItem(conversationUI: conversationUI, onClick: onClick)
+            EmptyConversationItem(
+                conversationUI: conversationUI,
+                onClick: onClick,
+                onLongClick: onLongClick
+            )
         }
     }
 }
@@ -124,23 +137,24 @@ struct UnreadConversationItem:View {
 struct EmptyConversationItem: View {
     private var conversationUI: ConversationUI
     private let onClick: () -> Void
-    
+    private let onLongClick: () -> Void
     @State private var isClicked: Bool = false
     @State private var elapsedTime: ElapsedTime = .now(seconds: 0)
     @State private var elapsedTimeText: String = ""
     
-    init(conversationUI: ConversationUI, onClick: @escaping () -> Void) {
+    init(
+        conversationUI: ConversationUI,
+        onClick: @escaping () -> Void,
+        onLongClick: @escaping () -> Void
+    ) {
         self.conversationUI = conversationUI
         self.onClick = onClick
+        self.onLongClick = onLongClick
     }
     
     var body: some View {
         HStack(alignment: .center) {
-            if let profilePictureUrl = conversationUI.interlocutor.profilePictureUrl {
-                ProfilePicture(url: profilePictureUrl, scale: 0.4)
-            } else {
-                DefaultProfilePicture(scale: 0.4)
-            }
+            ProfilePicture(url: conversationUI.interlocutor.profilePictureUrl, scale: 0.4)
             
             VStack(alignment: .leading, spacing: GedSpacing.verySmall) {
                 HStack {
@@ -152,7 +166,7 @@ struct EmptyConversationItem: View {
                         .foregroundStyle(.textPreview)
                 }
                 
-                Text(getString(gedString: GedString.tap_to_chat))
+                Text(getString(.tapToChat))
                     .foregroundStyle(.textPreview)
                     .font(.bodyMedium)
                     .lineLimit(1)
@@ -162,30 +176,31 @@ struct EmptyConversationItem: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.vertical, GedSpacing.small)
-        .background(Color(UIColor.systemBackground))
+        .contentShape(Rectangle())
         .onClick(isClicked: $isClicked, action: onClick)
+        .onLongClick(isClicked: $isClicked, action: onLongClick)
     }
 }
 
 private func updateElapsedTimeText(for date: Date) -> String {
-      let elapsedTime = GetElapsedTimeUseCase.execute(date: date)
-      return getElapsedTimeText(elapsedTime: elapsedTime, date: date)
-  }
+    let elapsedTime = GetElapsedTimeUseCase.execute(date: date)
+    return getElapsedTimeText(elapsedTime: elapsedTime, date: date)
+}
 
 private func getElapsedTimeText(elapsedTime: ElapsedTime, date: Date) -> String {
     switch elapsedTime {
-    case .now(_):
-        getString(gedString: GedString.now)
-    case.minute(let minutes):
-        getString(gedString: GedString.minutes_ago_short, minutes)
-    case .hour(let hours):
-        getString(gedString: GedString.hours_ago_short, hours)
-    case .day(let days):
-        getString(gedString: GedString.days_ago_short, days)
-    case .week(let weeks):
-        getString(gedString: GedString.weeks_ago_short, weeks)
-    default:
-        date.formatted(.dateTime.year().month().day())
+        case .now(_):
+            getString(.now)
+        case.minute(let minutes):
+            getString(.minutesAgoShort, minutes)
+        case .hour(let hours):
+            getString(.hoursAgoShort, hours)
+        case .day(let days):
+            getString(.daysAgoShort, days)
+        case .week(let weeks):
+            getString(.weeksAgoShort, weeks)
+        default:
+            date.formatted(.dateTime.year().month().day())
     }
 }
 
@@ -193,17 +208,20 @@ private func getElapsedTimeText(elapsedTime: ElapsedTime, date: Date) -> String 
     VStack(alignment: .leading, spacing: 0) {
         ReadConversationItem(
             conversationUI: conversationUIFixture,
-            onClick: {}
+            onClick: {},
+            onLongClick: {}
         )
         
         UnreadConversationItem(
             conversationUI: conversationUIFixture,
-            onClick: {}
+            onClick: {},
+            onLongClick: {}
         )
         
         EmptyConversationItem(
             conversationUI: conversationUIFixture,
-            onClick: {}
+            onClick: {},
+            onLongClick: {}
         )
     }
 }

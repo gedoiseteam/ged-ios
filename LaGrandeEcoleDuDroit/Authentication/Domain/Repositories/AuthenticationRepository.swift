@@ -1,7 +1,7 @@
 import Combine
 
-protocol AuthenticationRemoteRepository {
-    var isAuthenticated: AnyPublisher<Bool, Never> { get }
+protocol AuthenticationRepository {
+    var isAuthenticated: CurrentValueSubject<Bool, Never> { get }
     
     func register(email: String, password: String) async throws -> String
     
