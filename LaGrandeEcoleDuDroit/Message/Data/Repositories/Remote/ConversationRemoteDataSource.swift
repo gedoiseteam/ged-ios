@@ -11,14 +11,6 @@ class ConversationRemoteDataSource {
         conversationApi.listenConversations(userId: userId)
     }
     
-    func createConversation(remoteConversation: RemoteConversation) async throws {
-        try await conversationApi.createConversation(remoteConversation: remoteConversation)
-    }
-    
-    func deleteConversation(conversationId: String) async throws {
-        try await conversationApi.deleteConversation(conversationId: conversationId)
-    }
-    
     func stopListeningConversations() {
         conversationApi.stopListeningConversations()
     }

@@ -2,13 +2,13 @@ import Foundation
 import Combine
 
 class LogoutUseCase {
-    private let authenticationRepository: AuthenticationRepository
+    private let authenticationRemoteRepository: AuthenticationRemoteRepository
     
-    init(authenticationRepository: AuthenticationRepository) {
-        self.authenticationRepository = authenticationRepository
+    init(authenticationRemoteRepository: AuthenticationRemoteRepository) {
+        self.authenticationRemoteRepository = authenticationRemoteRepository
     }
     
     func execute() throws {
-        try authenticationRepository.logout()
+        try authenticationRemoteRepository.logout()
     }
 }

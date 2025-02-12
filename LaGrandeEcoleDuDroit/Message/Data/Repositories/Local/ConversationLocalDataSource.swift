@@ -4,13 +4,13 @@ import CoreData
 import os
 
 private let conversationEntityName = "LocalConversation"
-private let tag = String(describing: ConversationLocalDataSource.self)
 
 class ConversationLocalDataSource {
+    private let tag = String(describing: ConversationLocalDataSource.self)
     private let request = NSFetchRequest<LocalConversation>(entityName: conversationEntityName)
     private let context: NSManagedObjectContext
     
-    let conversationSubject = PassthroughSubject<LocalConversation, ConversationError>()
+    let conversationSubject: PassthroughSubject<LocalConversation, ConversationError> = PassthroughSubject()
     
     init(gedDatabaseContainer: GedDatabaseContainer) {
         context = gedDatabaseContainer.container.viewContext
@@ -29,7 +29,27 @@ class ConversationLocalDataSource {
         }
     }
     
-    func insertConversation(conversation: Conversation, interlocutor: User) throws {
+    func upsertConversation(conversation: Conversation, interlocutor: User) {
+        do {
+            if let localConversation = try context.fetch(request).first(where: { $0.conversationId == conversation.id }) {
+                guard let interlocutorJson = try? JSONEncoder().encode(interlocutor),
+                      let interlocutorJsonString = String(data: interlocutorJson, encoding: .utf8) else {
+                    e(tag, "Failed to encode interlocutor")
+                    return
+                }
+                
+                localConversation.interlocutorJson = interlocutorJsonString
+                try context.save()
+                conversationSubject.send(localConversation)
+            } else {
+                insertConversation(conversation: conversation, interlocutor: interlocutor)
+            }
+        } catch {
+            e(tag, "Failed to upsert conversation: \(error.localizedDescription)")
+        }
+    }
+    
+    func insertConversation(conversation: Conversation, interlocutor: User) {
         do {
             let localConversation = try ConversationMapper.toLocal(
                 conversation: conversation,
@@ -39,53 +59,7 @@ class ConversationLocalDataSource {
             try context.save()
             conversationSubject.send(localConversation)
         } catch {
-            e(tag, "Failed to insert conversation: \(error.localizedDescription)")
-            throw ConversationError.createFailed
-        }
-    }
-    
-    func upsertConversation(conversation: Conversation, interlocutor: User) throws {
-        request.predicate = NSPredicate(format: "conversationId == %@", conversation.id)
-        
-        do {
-            let localConversations = try context.fetch(request)
-            
-            if let localConversation = localConversations.first {
-                guard let interlocutorJson = try? JSONEncoder().encode(interlocutor),
-                      let interlocutorJsonString = String(data: interlocutorJson, encoding: .utf8) else {
-                    e(tag, "Failed to encode interlocutor")
-                    return
-                }
-                
-                localConversation.interlocutorJson = interlocutorJsonString
-                
-                try context.save()
-                conversationSubject.send(localConversation)
-            } else {
-                let localConversation = try ConversationMapper.toLocal(
-                    conversation: conversation,
-                    interlocutor: interlocutor,
-                    context: context
-                )
-                
-                try context.save()
-                conversationSubject.send(localConversation)
-            }
-        } catch {
-            e(tag, "Failed to upsert conversation: \(error.localizedDescription)")
-            throw ConversationError.upsertFailed
-        }
-    }
-    
-    func deleteConversation(conversationId: String) throws {
-        do {
-            if let localConversation = try context.fetch(request).first(where: { $0.conversationId == conversationId }) {
-                context.delete(localConversation)
-                try context.save()
-            }
-        } catch {
-            e(tag, "Failed to delete conversation: \(error.localizedDescription)")
-            throw ConversationError.deleteFailed
+            e(tag, "Failed to save conversation: \(error.localizedDescription)")
         }
     }
     

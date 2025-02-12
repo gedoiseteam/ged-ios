@@ -4,13 +4,16 @@ import CoreData
 import os
 
 private let announcementEntityName = "LocalAnnouncement"
-private let tag = String(describing: AnnouncementLocalDataSource.self)
+private let logger = Logger(subsystem: "com.upsaclay.gedoise", category: "AnnouncementLocalDataSource")
 
 class AnnouncementLocalDataSource {
     private let request = NSFetchRequest<LocalAnnouncement>(entityName: announcementEntityName)
     private let context: NSManagedObjectContext
     
-    private(set) var announcements = CurrentValueSubject<[Announcement], Never>([])
+    @Published private var _announcements: [Announcement] = []
+    var announcements: AnyPublisher<[Announcement], Never> {
+        $_announcements.eraseToAnyPublisher()
+    }
     
     init(gedDatabaseContainer: GedDatabaseContainer) {
         context = gedDatabaseContainer.container.viewContext
@@ -19,12 +22,11 @@ class AnnouncementLocalDataSource {
     
     private func fetchAnnouncements() {
         do {
-            let values = try context.fetch(request).map({ localAnnouncement in
+            _announcements = try context.fetch(request).map({ localAnnouncement in
                 AnnouncementMapper.toDomain(localAnnouncement: localAnnouncement)
             })
-            announcements.send(values)
         } catch {
-            e(tag, "Failed to fetch announcements: \(error)")
+            logger.error("Failed to fetch announcements: \(error)")
         }
     }
     
@@ -32,9 +34,9 @@ class AnnouncementLocalDataSource {
         do {
             AnnouncementMapper.toLocal(announcement: announcement, context: context)
             try context.save()
-            announcements.value.append(announcement)
+            _announcements.append(announcement)
         } catch {
-            e(tag, "Failed to insert announcement: \(error)")
+            logger.error("Failed to insert announcement: \(error)")
             throw error
         }
     }
@@ -54,23 +56,9 @@ class AnnouncementLocalDataSource {
             localAnnouncement?.userIsMember = announcement.author.isMember
             localAnnouncement?.userProfilePictureUrl = announcement.author.profilePictureUrl
             try context.save()
-            
-            announcements.value = announcements.value.map({ $0.id == announcement.id ? announcement : $0 })
+            _announcements = _announcements.map({ $0.id == announcement.id ? announcement : $0 })
         } catch {
-            e(tag, "Failed to update announcement: \(error)")
-            throw error
-        }
-    }
-    
-    func updateAnnouncementState(announcementId: String, state: AnnouncementState) async throws {
-        do {
-            let localAnnouncement = try context.fetch(request).first(where: { $0.announcementId == announcementId })
-            localAnnouncement?.announcementState = state.description
-            try context.save()
-            
-            announcements.value = announcements.value.map({ $0.id == announcementId ? AnnouncementMapper.toDomain(localAnnouncement: localAnnouncement!) : $0 })
-        } catch {
-            e(tag, "Failed to update announcement state: \(error)")
+            logger.error("Failed to update announcement: \(error)")
             throw error
         }
     }
@@ -83,6 +71,6 @@ class AnnouncementLocalDataSource {
             context.delete(localAnnouncement!)
             try context.save()
         }
-        announcements.value.removeAll { $0.id == announcement.id }
+        _announcements.removeAll { $0.id == announcement.id }
     }
 }

@@ -8,11 +8,15 @@ class CreateAnnouncementUseCase {
     }
     
     func execute(announcement: Announcement) async throws {
+        let loadingAnnouncement = announcement.with(state: .loading)
+        
         do {
-            try await announcementRepository.createAnnouncement(announcement: announcement.with(state: .loading))
-            try await announcementRepository.updateAnnouncementState(announcementId: announcement.id, state: .created)
+            try await announcementRepository.createAnnouncement(announcement: announcement)
+            let createdAnnouncement = announcement.with(state: .created)
+            try await announcementRepository.updateAnnouncement(announcement: createdAnnouncement)
         } catch {
-            try await announcementRepository.updateAnnouncementState(announcementId: announcement.id, state: .error(message: error.localizedDescription.description))
+            let errorAnnouncement = announcement.with(state: .error(message: error.localizedDescription.description))
+            try await announcementRepository.updateAnnouncement(announcement: errorAnnouncement)
             print(error.localizedDescription)
             throw error
         }

@@ -1,12 +1,9 @@
 import FirebaseFirestore
 import Combine
 
-let userTableName = "users"
-
-private let tag = String(describing: UserFirestoreApiImpl.self)
-
 class UserFirestoreApiImpl: UserFirestoreApi {
-    private let usersCollection: CollectionReference = Firestore.firestore().collection(userTableName)
+    private let usersCollection: CollectionReference = Firestore.firestore().collection("users")
+    private let tag = String(describing: UserFirestoreApiImpl.self)
     private var listeners: [ListenerRegistration] = []
     
     func createUser(firestoreUser: FirestoreUser) async throws {
@@ -24,20 +21,22 @@ class UserFirestoreApiImpl: UserFirestoreApi {
         return try? snapshot.data(as: FirestoreUser.self)
     }
     
-    func listenCurrentUser(userId: String) -> AnyPublisher<FirestoreUser?, Never> {
+    func listenUser(userId: String) -> AnyPublisher<FirestoreUser?, Never> {
         let subject = CurrentValueSubject<FirestoreUser?, Never>(nil)
         
         let listener = usersCollection
             .document(userId)
-            .addSnapshotListener { snapshot, error in
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
                 if let error = error {
-                    e(tag, "UserFirestoreApiImpl: Query error : \(error)")
+                    e(self.tag, "UserFirestoreApiImpl: Query error : \(error)")
                     subject.send(nil)
                     return
                 }
                 
                 guard let snapshot = snapshot else {
-                    e(tag, "UserFirestoreApiImpl: No snapshot for user: \(userId)")
+                    e(self.tag, "UserFirestoreApiImpl: No snapshot for user: \(userId)")
                     subject.send(nil)
                     return
                 }
@@ -53,30 +52,8 @@ class UserFirestoreApiImpl: UserFirestoreApi {
     }
     
     func getUsers() async throws -> [FirestoreUser] {
-        let snapshot = try await usersCollection
-            .limit(to: 20)
-            .getDocuments()
-        
+        let snapshot = try await usersCollection.getDocuments()
         return try snapshot.documents.compactMap { try $0.data(as: FirestoreUser.self) }
-    }
-    
-    func getFilteredUsers(filter: String) async throws -> [FirestoreUser] {
-        async let firstNameSnapshot = try await usersCollection
-            .whereField(FirestoreUserDataFields.firstName, isGreaterThanOrEqualTo: filter)
-            .whereField(FirestoreUserDataFields.firstName, isLessThanOrEqualTo: "\(filter)\u{f8ff}")
-            .limit(to: 20)
-            .getDocuments()
-        
-        async let lastNameSnapshot = try await usersCollection
-            .whereField(FirestoreUserDataFields.lastName, isGreaterThanOrEqualTo: filter)
-            .whereField(FirestoreUserDataFields.lastName, isLessThanOrEqualTo: "\(filter)\u{f8ff}")
-            .limit(to: 20)
-            .getDocuments()
-        
-        let firstNameUsers = try await firstNameSnapshot.documents.compactMap { try $0.data(as: FirestoreUser.self) }
-        let lastNameUsers = try await lastNameSnapshot.documents.compactMap { try $0.data(as: FirestoreUser.self) }
-        
-        return Array(Set(firstNameUsers + lastNameUsers))
     }
     
     func stopListeningUsers() {

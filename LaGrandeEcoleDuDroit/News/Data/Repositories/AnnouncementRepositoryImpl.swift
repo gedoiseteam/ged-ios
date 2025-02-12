@@ -12,7 +12,7 @@ class AnnouncementRepositoryImpl: AnnouncementRepository {
     ) {
         self.announcementLocalDataSource = announcementLocalDataSource
         self.announcementRemoteDataSource = announcementRemoteDataSource
-        self.announcements = announcementLocalDataSource.announcements.eraseToAnyPublisher()
+        self.announcements = announcementLocalDataSource.announcements
     }
     
     func createAnnouncement(announcement: Announcement) async throws {
@@ -29,10 +29,6 @@ class AnnouncementRepositoryImpl: AnnouncementRepository {
         
         try await localResult
         try await remoteResult
-    }
-    
-    func updateAnnouncementState(announcementId: String, state: AnnouncementState) async throws {
-        try await announcementLocalDataSource.updateAnnouncementState(announcementId: announcementId, state: state)
     }
     
     func deleteAnnouncement(announcement: Announcement) async throws {

@@ -1,8 +1,8 @@
 import Foundation
 
-private let tag = String(describing: UserOracleApiImpl.self)
-
 class UserOracleApiImpl: UserOracleApi {
+    private let tag = String(describing: UserOracleApiImpl.self)
+
     private func baseUrl(endPoint: String) -> URL? {
         URL.oracleUrl(endpoint: "/users/" + endPoint)
     }
@@ -20,13 +20,13 @@ class UserOracleApiImpl: UserOracleApi {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
-                e(tag, serverResponse.message)
+                e(self.tag, serverResponse.message)
             } else {
-                e(tag, serverResponse.error ?? "Error to create user")
+                e(self.tag, serverResponse.error ?? "Error to create user")
                 throw RequestError.invalidResponse(serverResponse.error)
             }
         } else {
-            e(tag, serverResponse.error ?? "Error to create user")
+            e(self.tag, serverResponse.error ?? "Error to create user")
             throw RequestError.invalidResponse(serverResponse.error)
         }
     }

@@ -31,25 +31,25 @@ class AuthenticationViewModel: ObservableObject {
     
     func validateInputs() -> Bool {
         guard !email.isEmpty, !password.isEmpty else {
-            authenticationState = .error(message: getString(.emptyInputsError))
+            authenticationState = .error(message: getString(gedString: GedString.empty_inputs_error))
             return false
         }
-        
+
         guard VerifyEmailFormatUseCase.execute(email) else {
-            authenticationState = .error(message: getString(.invalidEmailError))
+            authenticationState = .error(message: getString(gedString: GedString.invalid_email_error))
             return false
         }
         
         guard password.count >= 8 else {
-            authenticationState = .error(message: getString(.passwordLengthError))
+            authenticationState = .error(message: getString(gedString: GedString.password_length_error))
             return false
         }
-        
+
         return true
     }
     
     func login() async {
-        updateAuthenticationState(to: .loading)
+        await updateAuthenticationState(to: .loading)
         
         do {
             let userId = try await loginUseCase.execute(email: email, password: password)
@@ -58,50 +58,41 @@ class AuthenticationViewModel: ObservableObject {
                 let user = await getUserUseCase.execute(userId: userId)
                 if user != nil {
                     setCurrentUserUseCase.execute(user: user!)
-                    resetInputs()
-                    updateAuthenticationState(to: .authenticated)
+                    await updateAuthenticationState(to: .authenticated)
                 } else {
-                    updateAuthenticationState(to: .error(message: getString(.userNotExist)))
+                    await updateAuthenticationState(to: .error(message: getString(gedString: GedString.user_not_exist)))
                 }
             } else {
-                updateAuthenticationState(to: .emailNotVerified)
+                await updateAuthenticationState(to: .emailNotVerified)
             }
         } catch AuthenticationError.invalidCredentials {
-            updateAuthenticationState(to: .error(message: getString(.invalidCredentials)))
+            await updateAuthenticationState(to: .error(message: getString(gedString: GedString.invalid_credentials)))
         } catch AuthenticationError.userDisabled {
-            updateAuthenticationState(to: .error(message: getString(.userDisabled)))
+            await updateAuthenticationState(to: .error(message: getString(gedString: GedString.user_disabled)))
         } catch {
-            updateAuthenticationState(to: .error(message: getString(.unknownError)))
+            await updateAuthenticationState(to: .error(message: getString(gedString: GedString.unknown_error)))
+        }
+    }
+    
+    private func updateAuthenticationState(to state: AuthenticationState) async {
+        await MainActor.run {
+            authenticationState = state
         }
     }
     
     private func listenAuthenticationState() {
         isAuthenticatedUseCase.execute()
+            .receive(on: RunLoop.main)
             .sink(receiveCompletion: { completion in
                 switch completion {
-                    case .finished:
-                        break
-                    case .failure(let error):
-                        print("Error retrieving authentication state: \(error)")
+                case .finished:
+                    break
+                case .failure(let error):
+                    print("Error retrieving authentication state: \(error)")
                 }
             }, receiveValue: { [weak self] isAuthenticated in
                 self?.authenticationState = isAuthenticated ? .authenticated : .unauthenticated
             })
             .store(in: &cancellables)
-    }
-    
-    private func resetInputs() {
-        email = ""
-        password = ""
-    }
-    
-    private func updateAuthenticationState(to state: AuthenticationState) {
-        if Thread.isMainThread {
-            authenticationState = state
-        } else {
-            DispatchQueue.main.sync { [weak self] in
-                self?.authenticationState = state
-            }
-        }
     }
 }

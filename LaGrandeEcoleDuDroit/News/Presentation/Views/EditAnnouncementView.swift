@@ -1,54 +1,105 @@
 import SwiftUI
 
 struct EditAnnouncementView: View {
-    @EnvironmentObject private var announcementDetailViewModel: AnnouncementDetailViewModel
-    @FocusState private var inputFieldFocused: InputField?
+    @EnvironmentObject private var newsViewModel: NewsViewModel
+    private let announcement: Announcement
+    @State private var textHeight: CGFloat = 40
+    private let lineHeight: CGFloat = 24
     @State private var isActive: Bool = false
+    @Environment(\.dismiss) var dismiss
     @State private var showErrorAlert: Bool = false
     @State private var errorMessage: String = ""
     @State private var title: String
     @State private var content: String
-    
-    private let announcement: Announcement
-    private let onCancelClick: () -> Void
-    private let onSaveClick: (String, String) -> Void
-    
-    init(
-        announcement: Announcement,
-        onCancelClick: @escaping () -> Void,
-        onSaveClick: @escaping (String, String) -> Void
-    ) {
+
+    init(announcement: Announcement) {
         self.announcement = announcement
-        self.onCancelClick = onCancelClick
-        self.onSaveClick = onSaveClick
-        self.title =  announcement.title ?? ""
+        self.title = announcement.title ?? ""
         self.content = announcement.content
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: GedSpacing.medium) {
-            TextField(getString(.title), text: $title, axis: .vertical)
-                .font(.title2)
-                .fontWeight(.semibold)
-                .focused($inputFieldFocused, equals: InputField.title)
-            
-            TextField(getString(.content), text: $content, axis: .vertical)
-                .font(.bodyLarge)
-                .lineSpacing(5)
-                .focused($inputFieldFocused, equals: InputField.content)
+        GeometryReader { geometry in
+            VStack(alignment: .leading) {
+                HStack(alignment: .center) {
+                    Button(
+                        action: { dismiss() },
+                        label: { Text(getString(gedString: GedString.cancel)) }
+                    )
+                    
+                   Spacer()
+                    
+                    Button(
+                        action: {
+                            Task {
+                                await newsViewModel.updateAnnouncement(id: announcement.id, title: title, content: content)
+                                if newsViewModel.announcementState == .updated {
+                                    dismiss()
+                                }
+                            }
+                        },
+                        label: {
+                            if content.isEmpty || title == announcement.title && content == announcement.content {
+                                Text(getString(gedString: GedString.save))
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text(getString(gedString: GedString.save))
+                                    .foregroundColor(.gedPrimary)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    ).disabled(content.isEmpty || (title == announcement.title && content == announcement.content))
+                }.padding(.vertical, 5)
+                
+                TextEditor(text: $title)
+                    .font(.system(size: 22, weight: .semibold))
+                    .overlay {
+                        if title.isEmpty {
+                            Text(getString(gedString: GedString.title))
+                                .foregroundColor(.gray)
+                                .padding(.top, 10)
+                                .padding(.leading, 6)
+                                .font(.system(size: 22, weight: .semibold))
+                                .frame(
+                                    maxWidth: .infinity,
+                                    maxHeight: .infinity,
+                                    alignment: .topLeading
+                                )
+                        }
+                    }
+                    .frame(
+                        minHeight: geometry.size.height / 14,
+                        maxHeight: geometry.size.height / 6
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(Color.blue)
+                
+                TextEditor(text: $content)
+                    .overlay {
+                        if content.isEmpty {
+                            Text(getString(gedString: GedString.content))
+                                .foregroundColor(.gray)
+                                .padding(.top, 10)
+                                .padding(.leading, 6)
+                                .font(.body)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity,alignment: .topLeading)
+                        }
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding()
-        .onReceive(announcementDetailViewModel.$announcementState) { state in
+        .onReceive(newsViewModel.$announcementState) { state in
             switch state {
-                case .created:
-                    errorMessage = ""
-                    isActive = true
-                case .error(let message):
-                    errorMessage = message
-                    showErrorAlert = true
-                default:
-                    errorMessage = ""
+            case .created:
+                errorMessage = ""
+                isActive = true
+            case .error(let message):
+                errorMessage = message
+                showErrorAlert = true
+            default:
+                errorMessage = ""
             }
         }
         .alert(
@@ -56,52 +107,18 @@ struct EditAnnouncementView: View {
             isPresented: $showErrorAlert,
             presenting: ""
         ) { data in
-            Button(getString(.ok)) {
+            Button(getString(gedString: GedString.ok)) {
                 showErrorAlert = false
             }
         } message: { data in
             Text(errorMessage)
         }
-        .navigationTitle(getString(.edit))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(
-                    action: onCancelClick,
-                    label: { Text(getString(.cancel)) }
-                )
-            }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(
-                    action: { onSaveClick(title, content) },
-                    label: {
-                        if content.isEmpty || title == announcement.title && content == announcement.content {
-                            Text(getString(.save))
-                                .fontWeight(.semibold)
-                        } else {
-                            Text(getString(.save))
-                                .foregroundStyle(.gedPrimary)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                )
-                .disabled(content.isEmpty || (title == announcement.title && content == announcement.content))
-            }
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                inputFieldFocused = InputField.title
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            inputFieldFocused = nil
-        }
     }
 }
 
 #Preview {
-    EditAnnouncementView(announcement: announcementFixture, onCancelClick: {}, onSaveClick: { _, _ in })
-        .environmentObject(NewsInjection.shared.resolve(AnnouncementDetailViewModel.self))
+    NavigationView {
+        EditAnnouncementView(announcement: announcementFixture)
+            .environmentObject(DependencyContainer.shared.newsViewModel)
+    }
 }

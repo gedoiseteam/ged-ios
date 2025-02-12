@@ -1,4 +1,4 @@
-struct FirestoreUser: Codable, Hashable {
+struct FirestoreUser: Codable {
     let userId: String
     let firstName: String
     let lastName: String
@@ -7,10 +7,6 @@ struct FirestoreUser: Codable, Hashable {
     let isMember: Bool
     let profilePictureUrl: String?
     let isOnline: Bool
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(userId)
-    }
     
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"

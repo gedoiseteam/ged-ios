@@ -1,70 +1,52 @@
 import SwiftUI
 
 struct MainNavigationView: View {
-    private let isAuthenticatedUseCase: IsAuthenticatedUseCase = AuthenticationInjection.shared.resolve(IsAuthenticatedUseCase.self)
-    @State private var authenticationState: AuthenticationState = .idle
-    
-    var body: some View {
-        ZStack {
-            switch authenticationState {
-                case.idle:
-                    SplashScreen()
-                case .authenticated:
-                    Main()
-                default:
-                    AuthenticationNavigation()
-            }
-        }
-        .onReceive(isAuthenticatedUseCase.execute()) { value in
-            authenticationState = value ? .authenticated : .unauthenticated
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-}
-
-private enum Tabs {
-    case news, conversation, profile
-}
-
-struct Main: View {
-    @StateObject private var tabBarVisibility = TabBarVisibility()
-    @State private var selectedTab: Tabs = .news
+    @EnvironmentObject private var newsViewModel: NewsViewModel
+    @EnvironmentObject private var conversationViewModel: ConversationViewModel
+    @EnvironmentObject private var profileViewModel: ProfileViewModel
+    @State private var selectedTab: Int = 0
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            NewsNavigation()
-                .environmentObject(tabBarVisibility)
-                .tabItem {
-                    let icon = selectedTab == .news ? "house.fill" : "house"
-                    Label(getString(.home), systemImage: icon)
-                        .environment(\.symbolVariants, .none)
-                }
-                .tag(Tabs.news)
-                .toolbar(tabBarVisibility.show ? .visible : .hidden, for: .tabBar)
+            NavigationView {
+                NewsView()
+                    .environmentObject(newsViewModel)
+            }
+            .tabItem {
+                let icon = selectedTab == 0 ? "house.fill" : "house"
+                Label(getString(gedString: GedString.home), systemImage: icon)
+                    .environment(\.symbolVariants, .none)
+            }
+            .tag(0)
             
-            MessageNavigation()
-                .environmentObject(tabBarVisibility)
-                .tabItem {
-                    let icon = selectedTab == .conversation ? "message.fill" : "message"
-                    Label(getString(.messages), systemImage: icon)
-                        .environment(\.symbolVariants, .none)
-                }
-                .tag(Tabs.conversation)
-                .toolbar(tabBarVisibility.show ? .visible : .hidden, for: .tabBar)
+            NavigationView {
+                ConversationView()
+                    .environmentObject(conversationViewModel)
+            }
+            .tabItem {
+                let icon = selectedTab == 1 ? "message.fill" : "message"
+                Label(getString(gedString: GedString.messages), systemImage: icon)
+                    .environment(\.symbolVariants, .none)
+            }
+            .tag(1)
             
-            ProfileNavigation()
-                .environmentObject(tabBarVisibility)
-                .tabItem {
-                    let icon = selectedTab == .profile ? "person.fill" : "person"
-                    Label(getString(.profile), systemImage: icon)
-                        .environment(\.symbolVariants, .none)
-                }
-                .tag(Tabs.profile)
-                .toolbar(tabBarVisibility.show ? .visible : .hidden, for: .tabBar)
+            NavigationView {
+                ProfileView()
+                    .environmentObject(profileViewModel)
+            }
+            .tabItem {
+                let icon = selectedTab == 2 ? "person.fill" : "person"
+                Label(getString(gedString: GedString.profile), systemImage: icon)
+                    .environment(\.symbolVariants, .none)
+            }
+            .tag(2)
         }
     }
 }
 
 #Preview {
-    Main()
+    MainNavigationView()
+        .environmentObject(DependencyContainer.shared.newsViewModel)
+        .environmentObject(DependencyContainer.shared.conversationViewModel)
+        .environmentObject(DependencyContainer.shared.profileViewModel)
 }

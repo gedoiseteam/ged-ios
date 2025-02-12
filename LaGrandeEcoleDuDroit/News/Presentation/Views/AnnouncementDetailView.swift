@@ -1,135 +1,105 @@
 import SwiftUI
 
 struct AnnouncementDetailView: View {
-    @StateObject private var announcementDetailViewModel: AnnouncementDetailViewModel = NewsInjection.shared.resolve(AnnouncementDetailViewModel.self)
-    @EnvironmentObject private var coordinator: NavigationCoordinator
+    @Binding private var announcement: Announcement
+    @EnvironmentObject private var newsViewModel: NewsViewModel
+    @Environment(\.dismiss) private var dismiss
     @State private var showErrorAlert: Bool = false
     @State private var showDeleteAlert: Bool = false
     @State private var errorMessage: String = ""
-    @State private var editMode: Bool = false
-    private var announcement: Announcement
-        
-    init(announcement: Announcement) {
-        self.announcement = announcement
+    @State private var showEditBottomSheet: Bool = false
+    
+    init(announcement: Binding<Announcement>) {
+        self._announcement = announcement
     }
     
     var body: some View {
-        HStack {
-            if editMode {
-                editAnnouncement
-            } else {
-                readAnnouncement
-            }
-        }
-        .navigationBarBackButtonHidden(editMode)
-    }
-    
-    var readAnnouncement: some View {
-        VStack(alignment: .leading, spacing: GedSpacing.medium) {
-            HStack {
-                TopAnnouncementDetailItem(announcement: announcement)
-                
-                if let currentUser = announcementDetailViewModel.currentUser {
-                    if currentUser.isMember && announcement.author.id == currentUser.id {
-                        Menu {
-                            Button(
-                                action: { editMode = true },
-                                label: {
-                                    Label(getString(.edit), systemImage: "square.and.pencil")
-                                }
-                            )
-                            
-                            Button(
-                                role: .destructive,
-                                action: { showDeleteAlert = true },
-                                label: {
-                                    Label(getString(.delete), systemImage: "trash")
-                                }
-                            )
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .imageScale(.large)
-                                .padding(5)
+        ScrollView {
+            VStack(alignment: .leading, spacing: GedSpacing.medium) {
+                HStack {
+                    TopAnnouncementDetailItem(announcement: announcement)
+                        .padding(.top, 5)
+                    if let currentUser = newsViewModel.currentUser {
+                        if currentUser.isMember && announcement.author.id == currentUser.id {
+                            Menu {
+                                Button(
+                                    action: { showEditBottomSheet = true },
+                                    label: {
+                                        Label(getString(gedString: GedString.edit), systemImage: "square.and.pencil")
+                                    }
+                                )
+                                Button(
+                                    role: .destructive,
+                                    action: { showDeleteAlert = true },
+                                    label: {
+                                        Label(getString(gedString: GedString.delete), systemImage: "trash")
+                                    }
+                                )
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .imageScale(.large)
+                                    .padding(5)
+                            }
+                            .sheet(isPresented: $showEditBottomSheet) {
+                                EditAnnouncementView(announcement: announcement)
+                                    .environmentObject(newsViewModel)
+                            }
                         }
                     }
-                }
-            }
-            
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: GedSpacing.medium) {
-                    if let title = announcement.title, !title.isEmpty {
-                        Text(title)
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                }.onReceive(newsViewModel.$announcementState) { state in
+                    if case .deleted = state {
+                        dismiss()
+                    } else if case .error(let message) = state {
+                        errorMessage = message
+                        showErrorAlert = true
+                        newsViewModel.resetAnnouncementState()
                     }
-                    
-                    Text(announcement.content)
-                        .font(.bodyLarge)
-                        .lineSpacing(5)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+               if let title = announcement.title, !title.isEmpty {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.semibold)
+               }
+               
+                Text(announcement.content)
+                    .font(.body)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal)
+            .onAppear() {
+                
+                
+            }
+            .alert(
+                errorMessage,
+                isPresented: $showErrorAlert
+            ) {
+                Button(getString(gedString: GedString.ok)) {
+                    showErrorAlert = false
+                    newsViewModel.resetAnnouncementState()
+                }
+            }
+            .alert(
+                getString(gedString: GedString.delete_announcemment_alert_message),
+                isPresented: $showDeleteAlert
+            ) {
+                Button(getString(gedString: GedString.cancel), role: .cancel) {
+                    showErrorAlert = false
+                }
+                Button(getString(gedString: GedString.delete), role: .destructive) {
+                    Task {
+                        await newsViewModel.deleteAnnouncement(announcement: announcement)
+                    }
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal)
-        .alert(
-            errorMessage,
-            isPresented: $showErrorAlert
-        ) {
-            Button(getString(.ok)) {
-                showErrorAlert = false
-                announcementDetailViewModel.resetAnnouncementState()
-            }
-        }
-        .alert(
-            getString(.deleteAnnouncementAlertMessage),
-            isPresented: $showDeleteAlert
-        ) {
-            Button(getString(.cancel), role: .cancel) {
-                showDeleteAlert = false
-            }
-            Button(getString(.delete), role: .destructive) {
-                announcementDetailViewModel.deleteAnnouncement(announcement: announcement)
-            }
-        }
-        .onReceive(announcementDetailViewModel.$announcementState) { state in
-            if case .deleted = state {
-                announcementDetailViewModel.resetAnnouncementState()
-                coordinator.pop()
-            } else if case .error(let message) = state {
-                errorMessage = message
-                showErrorAlert = true
-                announcementDetailViewModel.resetAnnouncementState()
-            }
-        }
-    }
-    
-    var editAnnouncement: some View {
-        EditAnnouncementView(
-            announcement: announcement,
-            onCancelClick: {
-                editMode = false
-            },
-            onSaveClick: { title, content in
-                announcementDetailViewModel.updateAnnouncement(
-                    announcement: announcement.with(title: title, content: content, date: .now)
-                )
-            }
-        )
-        .onReceive(announcementDetailViewModel.$announcementState) { state in
-            if case .updated = state {
-                editMode = false
-            }
-        }
-        .environmentObject(announcementDetailViewModel)
     }
 }
 
-
 #Preview {
-    NavigationStack {
-        AnnouncementDetailView(announcement: announcementFixture)
-            .environmentObject(NavigationCoordinator())
-    }
+    AnnouncementDetailView(
+        announcement: .constant(announcementFixture)
+    ).environmentObject(DependencyContainer.shared.mockNewsViewModel)
 }

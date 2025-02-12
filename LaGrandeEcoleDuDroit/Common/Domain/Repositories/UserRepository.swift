@@ -13,8 +13,6 @@ protocol UserRepository {
     
     func getUsers() async throws -> [User]
     
-    func getFilteredUsers(filter: String) async -> [User]
-    
     func setCurrentUser(user: User)
     
     func removeCurrentUser()

@@ -1,11 +1,14 @@
 import Foundation
 import Combine
 
-class MockAuthenticationRepository: AuthenticationRepository {
-    var isAuthenticated = CurrentValueSubject<Bool, Never>(false)
+class MockAuthenticationRemoteRepository: AuthenticationRemoteRepository {
+    @Published private var _isAuthenticated: Bool = false
+    var isAuthenticated: AnyPublisher<Bool, Never> {
+        $_isAuthenticated.eraseToAnyPublisher()
+    }
     
     func register(email: String, password: String) async throws -> String {
-        isAuthenticated.send(true)
+        _isAuthenticated = true
         return ""
     }
     
@@ -16,11 +19,13 @@ class MockAuthenticationRepository: AuthenticationRepository {
     }
     
     func login(email: String, password: String) async throws -> String {
-        isAuthenticated.send(true)
+        _isAuthenticated = true
         return ""
     }
     
     func logout() throws {
-        isAuthenticated.send(false)
-    }    
+        _isAuthenticated = false
+    }
+    
+    
 }
