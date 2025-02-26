@@ -5,8 +5,7 @@ class GedConfiguration {
     private init() {}
     
     #if DEBUG
-    // Set your local server url here
-    static let serverUrl = "http://192.168.57.137:3000"
+    static let serverUrl = "http://localhost:3000"
     #else
     static let serverUrl = "http:89.168.52.45//:3000"
     #endif
