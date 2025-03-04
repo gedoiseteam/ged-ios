@@ -7,7 +7,7 @@ class GedConfiguration {
     #if DEBUG
     static let serverUrl = "http://localhost:3000"
     #else
-    static let serverUrl = "http:89.168.52.45//:3000"
+    static let serverUrl = "https://gedserver.duckdns.org:3000"
     #endif
     
     static func configureDebugFirebase() {
