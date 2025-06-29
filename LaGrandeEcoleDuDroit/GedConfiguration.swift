@@ -6,6 +6,7 @@ class GedConfiguration {
     
     #if DEBUG
     static let serverUrl = "http://192.168.1.67:3000"
+    static let serverUrl = "https://gedserver.duckdns.org:3000"
     #else
     static let serverUrl = "https://gedserver.duckdns.org:3000"
     #endif
