@@ -5,9 +5,9 @@ class GedConfiguration {
     private init() {}
     
     #if DEBUG
-    static let serverUrl = "http://localhost:3000"
+    static let serverUrl = ""
     #else
-    static let serverUrl = "https://gedserver.duckdns.org:3000"
+    static let serverUrl = "https://gedserver.dedyn.io:3000"
     #endif
     
     static func configureDebugFirebase() {
